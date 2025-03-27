@@ -1,7 +1,7 @@
 from typing import List
 from llmperf.ray_clients.litellm_client import LiteLLMClient
 from llmperf.ray_clients.lookahead_client import LookaheadClient
-# from llmperf.ray_clients.nvcf_client import NVCFClient
+from llmperf.ray_clients.nvcf_client import NVCFChatCompletionsClient
 from llmperf.ray_clients.openai_chat_completions_client import (
     OpenAIChatCompletionsClient,
 )
@@ -32,6 +32,8 @@ def construct_clients(llm_api: str, num_clients: int) -> List[LLMClient]:
         clients = [VertexAIClient.remote() for _ in range(num_clients)]
     elif llm_api == "lookahead":
         clients = [LookaheadClient.remote() for _ in range(num_clients)]
+    elif llm_api == "nvcf":
+        clients = [NVCFChatCompletionsClient.remote() for _ in range(num_clients)]
     elif llm_api in SUPPORTED_APIS:
         clients = [LiteLLMClient.remote() for _ in range(num_clients)]
     else:

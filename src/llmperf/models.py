@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from pydantic import BaseModel
 
 
@@ -15,7 +15,7 @@ class RequestConfig(BaseModel):
     """
 
     model: str
-    prompt: Tuple[str, int]
+    prompt: Tuple[Union[str, List[Dict[str, Any]]], int]
     sampling_params: Optional[Dict[str, Any]] = None
     llm_api: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None

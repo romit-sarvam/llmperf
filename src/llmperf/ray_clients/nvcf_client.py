@@ -12,8 +12,8 @@ from llmperf import common_metrics
 
 
 @ray.remote
-class OpenAIChatCompletionsClient(LLMClient):
-    """Client for OpenAI Chat Completions API."""
+class NVCFChatCompletionsClient(LLMClient):
+    """Client for NVCFChat Completions API."""
 
     def llm_request(self, request_config: RequestConfig) -> Dict[str, Any]:
         prompt = request_config.prompt
@@ -53,7 +53,11 @@ class OpenAIChatCompletionsClient(LLMClient):
         key = os.environ.get("OPENAI_API_KEY")
         if not key:
             raise ValueError("the environment variable OPENAI_API_KEY must be set.")
-        headers = {"Authorization": f"Bearer {key}"}
+        headers = {
+            "accept": "text/event-stream",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {key}",
+        }
         if not address:
             raise ValueError("No host provided.")
 

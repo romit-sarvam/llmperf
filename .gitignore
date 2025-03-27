@@ -239,11 +239,13 @@ build/
 dist/
 
 # results
-output/
 *.json
 result_outputs/
+output*/
 
 __pycache__
 **/__pycache__/
 
 .env
+*.png
+*.csv

@@ -17,7 +17,6 @@ function cleanup() {
   exit 1
 }
 
-# Arrays for parameter values
 
 CONCURRENT_REQUESTS=(1 2 4 8 16 32 64 128 256)
 COMPLETED_REQUESTS=(16 32 64 128 256 512 1024 1024 1024)
@@ -30,7 +29,9 @@ for i in {0..8}; do
   echo "Running with concurrent-requests=${concurrent}, max-completed-requests=${completed}, dtype=${DTYPE}, tp=${TP_SIZE}, engine=${ENGINE}"
 
   python token_benchmark_ray.py \
-    --model "$MODEL_PATH" \
+    --model "$MODEL" \
+    --tokenizer-path "$TOKENIZER_PATH" \
+    --dataset-path "$DATASET" \
     --mean-input-tokens 512 \
     --stddev-input-tokens 128 \
     --mean-output-tokens 4096 \
@@ -38,8 +39,8 @@ for i in {0..8}; do
     --max-num-completed-requests ${completed} \
     --timeout 1200 \
     --num-concurrent-requests ${concurrent} \
-    --results-dir "tmp" \
-    --llm-api openai \
+    --results-dir "$RESULTS_DIR" \
+    --llm-api $LLM_API \
     --additional-sampling-params '{"max_tokens": 7192}' \
     --metadata dtype=${DTYPE},tp=${TP_SIZE},engine=${ENGINE}
   

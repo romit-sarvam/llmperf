@@ -19,10 +19,16 @@ class OpenAIChatCompletionsClient(LLMClient):
         prompt = request_config.prompt
         prompt, prompt_len = prompt
 
-        message = [
-            {"role": "system", "content": ""},
-            {"role": "user", "content": prompt},
-        ]
+        if type(prompt) == str:
+            message = [
+                {"role": "system", "content": ""},
+                {"role": "user", "content": prompt},
+            ]
+        elif type(prompt) == list:
+            message = prompt
+        else:
+            raise ValueError("Invalid prompt type, only str or list are supported, received: ", type(prompt))
+
         model = request_config.model
         body = {
             "model": model,

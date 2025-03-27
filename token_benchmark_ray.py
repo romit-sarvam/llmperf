@@ -28,21 +28,47 @@ from dotenv import load_dotenv
 from transformers import LlamaTokenizerFast, AutoTokenizer
 random.seed(11111)
 
-def prepare_ds():
-    from glob import glob
+def prepare_ds(ds_path, sample_size=1024):
+    """
+    Prepare the dataset for the token benchmark.
+    The dataset should be a parquet file with a 'prompt' column.
+    The prompt column can be of two types:
+    - str: The prompt is a single string. This will be sent as a user message to the LLM
+        without any system message.
+    - dict: The prompt is a correctly formatted OpenAI chat completion messages
+        dictionary. Similar to this:
+        message = [
+                {"role": "system", "content": "system prompt"},
+                {"role": "user", "content": "user prompt"},
+            ]
+    Args:
+        ds_path: The path to the dataset to use for the token benchmark.
+        sample_size: The number of samples to use from the dataset.
+
+    Returns:
+        The prepared dataset.
+    """
+
     from datasets import load_dataset
 
-    dataset_files = glob(
-        '/Users/romitjain/.cache/huggingface/hub/datasets--sarvam--llamaseek-sft-data/snapshots/ad343dbd2790ee81d42a3004c6be0cc4591025d4/generations-v4/*.parquet'
-    )
+    if '*' in ds_path:
+        from glob import glob
+        dataset_files = glob(ds_path)
+        ds = load_dataset("parquet", data_files=dataset_files)
+    else:
+        ds = load_dataset("parquet", data_files=ds_path)
+    
+    ds = ds['train'].shuffle().select(range(sample_size))
+    assert 'prompt' in ds.column_names, "Dataset must have a 'prompt' column"
 
-    ds = load_dataset("parquet", data_files=dataset_files)
-    ds = ds['train'].shuffle().select(range(1024))
+    print(f"Dataset has {len(ds)} samples")
 
     return ds
 
 def get_token_throughput_latencies(
     model: str,
+    tokenizer_path: str,
+    ds_path: str,
     mean_input_tokens: int,
     stddev_input_tokens: int,
     mean_output_tokens: int,
@@ -50,6 +76,7 @@ def get_token_throughput_latencies(
     additional_sampling_params: Optional[Dict[str, Any]] = None,
     num_concurrent_requests: int = 1,
     max_num_completed_requests: int = 500,
+    prompt_type: str = "message",
     test_timeout_s=90,
     llm_api="openai",
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -75,11 +102,14 @@ def get_token_throughput_latencies(
     """
     random.seed(11111)
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        "/Users/romitjain/projects/mistral-24b/"
-    )
-    get_token_length = lambda text: len(tokenizer.encode(text))
-    prompt_dataset = prepare_ds()
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    if prompt_type == "chat":
+        get_token_length = lambda text: len(tokenizer.apply_chat_template(text, tokenize=True))
+    elif prompt_type == "message":
+        get_token_length = lambda text: len(tokenizer.encode(text))
+    else:
+        raise ValueError(f"Invalid prompt type: {prompt_type}")
+    prompt_dataset = prepare_ds(ds_path)
 
     if not additional_sampling_params:
         additional_sampling_params = {}
@@ -95,13 +125,6 @@ def get_token_throughput_latencies(
             mean_output_tokens, stddev_output_tokens
         ))
         num_output_tokens_list.append(num_output_tokens)
-
-        # prompts.append(randomly_sample_sonnet_lines_prompt(
-        #     prompt_tokens_mean=mean_input_tokens,
-        #     prompt_tokens_stddev=stddev_input_tokens,
-        #     expect_output_tokens=num_output_tokens,
-        #     tokenizer=tokenizer
-        # ))
 
         example = prompt_dataset.shuffle().select(range(1))[0]
         single_prompt = (example['prompt'], get_token_length(example['prompt']))
@@ -310,6 +333,8 @@ def metrics_summary(
 def run_token_benchmark(
     llm_api: str,
     model: str,
+    tokenizer_path: str,
+    ds_path: str,
     test_timeout_s: int,
     max_num_completed_requests: int,
     num_concurrent_requests: int,
@@ -320,6 +345,7 @@ def run_token_benchmark(
     additional_sampling_params: str,
     results_dir: str,
     user_metadata: Dict[str, Any],
+    prompt_type: str,
 ):
     """
     Args:
@@ -346,6 +372,8 @@ def run_token_benchmark(
 
     summary, individual_responses = get_token_throughput_latencies(
         model=model,
+        tokenizer_path=tokenizer_path,
+        ds_path=ds_path,
         llm_api=llm_api,
         test_timeout_s=test_timeout_s,
         max_num_completed_requests=max_num_completed_requests,
@@ -355,6 +383,7 @@ def run_token_benchmark(
         stddev_output_tokens=stddev_output_tokens,
         num_concurrent_requests=num_concurrent_requests,
         additional_sampling_params=json.loads(additional_sampling_params),
+        prompt_type=prompt_type
     )
 
     if results_dir:
@@ -396,6 +425,12 @@ def parse_args():
 
     args.add_argument(
         "--model", type=str, required=True, help="The model to use for this load test."
+    )
+    args.add_argument(
+        "--tokenizer-path", type=str, required=True, help="The path to the tokenizer to use for this load test."
+    )
+    args.add_argument(
+        "--dataset-path", type=str, required=True, help="Dataset to use for this load test."
     )
     args.add_argument(
         "--mean-input-tokens",
@@ -491,7 +526,14 @@ def parse_args():
             "name=foo,bar=1. These will be added to the metadata field of the results. "
         ),
     )
-
+    args.add_argument(
+        "--prompt-type",
+        type=str,
+        default="message",
+        help=(
+            "The type of prompt to use for the load test. Can select from {message, chat}"
+        ),
+    )
     return args.parse_args()
 
 if __name__ == "__main__":
@@ -510,6 +552,8 @@ if __name__ == "__main__":
     run_token_benchmark(
         llm_api=args.llm_api,
         model=args.model,
+        tokenizer_path=args.tokenizer_path,
+        ds_path=args.dataset_path,
         test_timeout_s=args.timeout,
         max_num_completed_requests=args.max_num_completed_requests,
         mean_input_tokens=args.mean_input_tokens,
@@ -519,5 +563,6 @@ if __name__ == "__main__":
         num_concurrent_requests=args.num_concurrent_requests,
         additional_sampling_params=args.additional_sampling_params,
         results_dir=args.results_dir,
+        prompt_type=args.prompt_type,
         user_metadata=user_metadata,
     )
