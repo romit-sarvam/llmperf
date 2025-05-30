@@ -1,5 +1,6 @@
 #!/bin/bash
-set +xe
+set -e
+set -x
 
 # Load environment variables from .env file
 if [ -f .env ]; then
@@ -18,11 +19,11 @@ function cleanup() {
 }
 
 
-CONCURRENT_REQUESTS=(1 2 4 8 16 32 64 128 256)
-COMPLETED_REQUESTS=(16 32 64 128 256 512 1024 1024 1024)
+CONCURRENT_REQUESTS=(1 2 4 8 16 32 64 128 256 512)
+COMPLETED_REQUESTS=(16 32 64 128 256 512 512 512 512 1024)
 
 # Loop through the parameter combinations
-for i in {0..8}; do
+for ((i=0; i<${#COMPLETED_REQUESTS[@]}; i++)); do
   concurrent=${CONCURRENT_REQUESTS[$i]}
   completed=${COMPLETED_REQUESTS[$i]}
   
@@ -44,7 +45,7 @@ for i in {0..8}; do
     --additional-sampling-params '{"max_tokens": 7192}' \
     --metadata dtype=${DTYPE},tp=${TP_SIZE},engine=${ENGINE}
   
-  echo "Completed run ${i} of 8"
+  echo "Completed run ${i}"
   echo "-----------------------------------------"
 done
 

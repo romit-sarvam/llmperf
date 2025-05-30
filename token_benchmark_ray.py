@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 from transformers import LlamaTokenizerFast, AutoTokenizer
 random.seed(11111)
 
-def prepare_ds(ds_path, sample_size=1024):
+def prepare_ds(ds_path, sample_size=10000):
     """
     Prepare the dataset for the token benchmark.
     The dataset should be a parquet file with a 'prompt' column.
@@ -56,7 +56,8 @@ def prepare_ds(ds_path, sample_size=1024):
         dataset_files = glob(ds_path)
         ds = load_dataset("parquet", data_files=dataset_files)
     else:
-        ds = load_dataset("parquet", data_files=ds_path)
+        # ds = load_dataset("parquet", data_files=ds_path)
+        ds = load_dataset(ds_path)
     
     ds = ds['train'].shuffle().select(range(sample_size))
     assert 'prompt' in ds.column_names, "Dataset must have a 'prompt' column"
@@ -127,7 +128,18 @@ def get_token_throughput_latencies(
         num_output_tokens_list.append(num_output_tokens)
 
         example = prompt_dataset.shuffle().select(range(1))[0]
-        single_prompt = (example['prompt'], get_token_length(example['prompt']))
+        if prompt_type == "chat":
+            msg = example["messages"]
+
+            if len(msg) > 1:
+                msg = msg[:-1]
+                msg[-1]["content"] = "Summarize our conversation in 1000 words or more. Be extremely detailed and thorough. Hallucinate the conversation if you must."
+            if msg[-1]["role"] != "user":
+                msg.append({"role": "user", "content": "Tell me a new story that is at least 1000 words long. Be extremely detailed and thorough."})
+
+            single_prompt = (msg, get_token_length(msg))
+        else:
+            single_prompt = (example["prompt"], get_token_length(example["prompt"]))
 
         prompts.append(single_prompt)
 
@@ -159,7 +171,7 @@ def get_token_throughput_latencies(
             all_metrics = []
             for out in outs:
                 request_metrics, gen_text, ret_request_config = out
-                num_output_tokens = get_token_length(gen_text)
+                num_output_tokens = len(tokenizer.encode(gen_text))
                 with completed_requests_lock:
                     if num_completed_requests < max_num_completed_requests:
                         if num_output_tokens:
@@ -199,7 +211,7 @@ def get_token_throughput_latencies(
     all_metrics = []
     for out in outs:
         request_metrics, gen_text, ret_request_config = out
-        num_output_tokens = get_token_length(gen_text)
+        num_output_tokens = len(tokenizer.encode(gen_text))
         with completed_requests_lock:
             if num_completed_requests < max_num_completed_requests:
                 if num_output_tokens:
@@ -214,7 +226,7 @@ def get_token_throughput_latencies(
 
                 completed_requests.extend(request_metrics)
 
-    print(f"\Results for token benchmark for {model} queried with the {llm_api} api.\n")
+    print(f"\nResults for token benchmark for {model} queried with the {llm_api} api.\n")
     ret = metrics_summary(completed_requests, start_time, end_time)
 
     metadata = {
