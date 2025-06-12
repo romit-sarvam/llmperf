@@ -43,7 +43,8 @@ for ((i=0; i<${#COMPLETED_REQUESTS[@]}; i++)); do
     --results-dir "$RESULTS_DIR" \
     --llm-api $LLM_API \
     --additional-sampling-params '{"max_tokens": 7192}' \
-    --metadata dtype=${DTYPE},tp=${TP_SIZE},engine=${ENGINE}
+    --metadata dtype=${DTYPE},tp=${TP_SIZE},engine=${ENGINE} \
+    # --prompt-type chat
   
   echo "Completed run ${i}"
   echo "-----------------------------------------"

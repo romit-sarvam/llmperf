@@ -58,6 +58,7 @@ def prepare_ds(ds_path, sample_size=10000):
     else:
         # ds = load_dataset("parquet", data_files=ds_path)
         ds = load_dataset(ds_path)
+        ds = ds.rename_columns({"input_chat_dict": "prompt"})
     
     ds = ds['train'].shuffle().select(range(sample_size))
     assert 'prompt' in ds.column_names, "Dataset must have a 'prompt' column"
@@ -129,15 +130,7 @@ def get_token_throughput_latencies(
 
         example = prompt_dataset.shuffle().select(range(1))[0]
         if prompt_type == "chat":
-            msg = example["messages"]
-
-            if len(msg) > 1:
-                msg = msg[:-1]
-                msg[-1]["content"] = "Summarize our conversation in 1000 words or more. Be extremely detailed and thorough. Hallucinate the conversation if you must."
-            if msg[-1]["role"] != "user":
-                msg.append({"role": "user", "content": "Tell me a new story that is at least 1000 words long. Be extremely detailed and thorough."})
-
-            single_prompt = (msg, get_token_length(msg))
+            single_prompt = (example["prompt"], get_token_length(example["prompt"]))
         else:
             single_prompt = (example["prompt"], get_token_length(example["prompt"]))
 

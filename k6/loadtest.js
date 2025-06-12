@@ -18,7 +18,7 @@ const prompts = [
 ];
 
 const API_URL = 'https://api.nvcf.nvidia.com/v2/nvcf/pexec/functions/f06a2c59-3d8d-4bfb-bd3f-44f3235b0541';
-const API_KEY = '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';
+const API_KEY = '';
 
 export default function () {
     // Select a random prompt
